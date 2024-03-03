@@ -1,6 +1,7 @@
 import Lake
 open Lake DSL
 
+require Http from git "https://github.com/Yuras/lean4-http" @ "http-client"
 require socket from git "https://github.com/hargoniX/socket.lean" @ "main"
 
 package «http-client» where

@@ -1,4 +1,5 @@
 import «HttpClient»
+import «Http»
 import «Socket»
 
 partial
