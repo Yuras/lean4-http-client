@@ -10,7 +10,10 @@ inductive Method where
   | POST
 
 def renderPath (uri : Http.URI) : String :=
-  if uri.path.isEmpty
+  path ++ query
+  where
+  query := uri.query.map ("?" ++ toString ·) |>.getD ""
+  path := if uri.path.isEmpty
     then "/"
     else uri.path.foldl (· ++ "/" ++ ·) ""
 
@@ -37,7 +40,7 @@ def readAll (s : Socket) : IO ByteArray := go List.nil
         let str := r
         go (List.cons str res)
 
-def method (method : Method) (url : String) (body : Option ByteArray) : IO ByteArray := do
+def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http.Response String) := do
   -- parse the URL
   let uri ← match Http.URI.parse.run url with
     | .ok ss r => if ss.isEmpty then pure r else throw (IO.userError s!"parse url: leftofer {ss}")
@@ -59,11 +62,6 @@ def method (method : Method) (url : String) (body : Option ByteArray) : IO ByteA
     | none => throw (IO.userError "no address!")
     | some a => pure a
 
-  -- create socket
-  let sock ← Socket.mk .inet .stream
-  let addr := match addrInfo with
-    | .inet host port => Socket.SockAddr4.v4 host port
-
   -- build the request
   let request := {
     method := match method with
@@ -84,10 +82,14 @@ def method (method : Method) (url : String) (body : Option ByteArray) : IO ByteA
       | .some b => String.fromUTF8Unchecked b -- XXX
     : Http.Request String
   }
+  IO.println s!"sending request\n{toRequestString request}\nend request"
 
-  -- IO.println s!"sending request\n{toRequestString request}\nend request"
+  -- create socket
+  let addr := match addrInfo with
+    | .inet host port => Socket.SockAddr4.v4 host port
+  let sock ← Socket.mk .inet .stream
 
-  -- send it
+  -- send the request
   let resp ←
     try
       sock.connect addr
@@ -97,14 +99,19 @@ def method (method : Method) (url : String) (body : Option ByteArray) : IO ByteA
     finally
       -- I beleive I don't need this?
       sock.close
-
   -- IO.println s!"response:\n{String.fromUTF8Unchecked resp}\nend response"
-  pure resp
 
-def get (url : String) : IO ByteArray := do
-  method .GET url .none
+  let responseParser := Http.Response.parse (pure ())
+  match responseParser.run (String.fromUTF8Unchecked resp) with
+  | .ok body resp => pure {resp with body := body.toString}
+  | .error e => throw (IO.userError s!"can't parse response {e}")
 
-def post (url : String) (body : ByteArray) : IO ByteArray := do
-  method .POST url body
+def get (url : String) : IO String := do
+  let response ← method .GET url .none
+  pure (response.body)
+
+def post (url : String) (body : ByteArray) : IO String := do
+  let response ← method .POST url body
+  pure (response.body)
 
 end HttpClient
