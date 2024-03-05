@@ -48,7 +48,8 @@ def Connection.make
 def Connectin.makeFromList (list : List ByteArray) : IO Connection := do
   let ref ← IO.mkRef list
   let send _ := pure ()
-  let receive := match ← ref.get with
+  let receive := do
+    match ← ref.get with
     | .nil => pure .none
     | .cons chunk rest => do
       ref.set rest

@@ -12,8 +12,11 @@ lean_lib «HttpClient» where
   -- add library configuration options here
 
 @[default_target]
-lean_exe «http-client» where
+lean_exe «http-client-main» where
   root := `Main
+
+lean_exe «http-client-spec» where
+  root := `Spec
 
 target http.o pkg : FilePath := do
   let oFile := pkg.buildDir / "native" / "http.o"
