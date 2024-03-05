@@ -2,6 +2,7 @@
 import «Http»
 import «Socket»
 import «HttpClient».AddrInfo
+import «HttpClient».Connection
 
 namespace HttpClient
 
@@ -27,18 +28,6 @@ def toRequestString [ToString T] (r : Http.Request T) : String :=
   r.headers.toRequestFormat ++
   Http.CRLF ++
   toString r.body
-
-/-- Read everything from the socket til the EOF -/
-partial
-def readAll (s : Socket) : IO ByteArray := go List.nil
-  where
-  go res := do
-    let r ← s.recv 4096
-    if r.size == 0
-      then return (res.reverse.foldl (fun a b => a.append b) ByteArray.empty)
-      else do
-        let str := r
-        go (List.cons str res)
 
 def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http.Response String) := do
   -- parse the URL
@@ -84,21 +73,28 @@ def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http
   }
   IO.println s!"sending request\n{toRequestString request}\nend request"
 
-  -- create socket
-  let addr := match addrInfo with
-    | .inet host port => Socket.SockAddr4.v4 host port
-  let sock ← Socket.mk .inet .stream
+  -- connect
+  let connection ← do
+    let addr := match addrInfo with
+      | .inet host port => Socket.SockAddr4.v4 host port
+    let sock ← Socket.mk .inet .stream
+    try
+      sock.connect addr
+      Connection.make
+        (λ c => sock.send c >>= λ _ => pure ())
+        (.some <$> sock.recv 4096)
+        sock.close
+    catch e =>
+      sock.close
+      throw e
 
   -- send the request
   let resp ←
     try
-      sock.connect addr
-      let _ ← sock.send (toRequestString request).toUTF8
-      let blocks ← readAll sock
-      pure blocks
+      connection.send (toRequestString request).toUTF8
+      connection.readAll
     finally
-      -- I beleive I don't need this?
-      sock.close
+      connection.close
   -- IO.println s!"response:\n{String.fromUTF8Unchecked resp}\nend response"
 
   let responseParser := Http.Response.parse (pure ())
