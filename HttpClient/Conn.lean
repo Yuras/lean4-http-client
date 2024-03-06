@@ -8,13 +8,7 @@ def Conn.make (receive_ : IO (Option ByteArray)) : IO Conn := do
   pure {
     receive := do
       match ← memRef.get with
-        | .nil => do
-          match ← receive_ with
-          | .none => pure .none
-          | .some chunk =>
-            if chunk.isEmpty
-              then pure .none
-              else pure (.some chunk)
+        | .nil => receive_
         | .cons chunk rest => do
           memRef.set rest
           pure (.some chunk)
@@ -27,10 +21,11 @@ def Conn.make (receive_ : IO (Option ByteArray)) : IO Conn := do
   let c ← Conn.make (pure .none)
   c.receive
 #eval unsafeIO $ do
-  let c ← Conn.make (pure .none)
+  let c ← Conn.make (pure (.some "test".toUTF8))
   c.push "hello".toUTF8
-  let res ← c.receive
-  pure (Option.map String.fromUTF8Unchecked res)
+  let res1 ← c.receive
+  let res2 ← c.receive
+  pure ([res1, res2].map (Option.map String.fromUTF8Unchecked))
 
 theorem push_receive (receive_ : IO (Option ByteArray)) (chunk : ByteArray)
   : (Conn.make receive_ >>= λ conn => conn.push chunk >>= λ _ => conn.receive) = pure chunk := by
