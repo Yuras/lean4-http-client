@@ -46,6 +46,11 @@ def connectionSpec : IO Unit := do
     pure (r1.map String.fromUTF8Unchecked == "AB"
       && r2.map String.fromUTF8Unchecked == "C"
       && r3.isNone)
+  case "push and receive gives back the pushed value" $ do
+    let c ← Connectin.makeFromList (["AB", "C"].map String.toUTF8)
+    c.push "DE".toUTF8
+    let r ← c.receive
+    pure (r.map String.fromUTF8Unchecked == "DE")
 
 def main : IO Unit := do
   refSpec
