@@ -1,5 +1,6 @@
 import «HttpClient»
 import «HttpClient».Connection
+import «HttpClient».Conn
 import «Soda»
 
 def main : IO Unit := do
