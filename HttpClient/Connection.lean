@@ -45,7 +45,14 @@ def Connection.make
     : Connection
   }
 
-def Connectin.makeFromList (list : List ByteArray) : IO Connection := do
+partial def Connection.readAll (c : Connection) : IO ByteArray := go []
+  where
+  go res := do
+    match ← c.receive with
+    | .none => pure (res.reverse.foldl (fun a b => a.append b) ByteArray.empty)
+    | .some chunk => go (chunk :: res)
+
+def Connection.makeFromList (list : List ByteArray) : IO Connection := do
   let ref ← IO.mkRef list
   let send _ := pure ()
   let receive := do
@@ -56,9 +63,14 @@ def Connectin.makeFromList (list : List ByteArray) : IO Connection := do
       pure (.some chunk)
   Connection.make send receive (pure ())
 
-partial def Connection.readAll (c : Connection) : IO ByteArray := go []
-  where
-  go res := do
-    match ← c.receive with
-    | .none => pure (res.reverse.foldl (fun a b => a.append b) ByteArray.empty)
-    | .some chunk => go (chunk :: res)
+/-- Listen to what has been sent through the connection
+
+Returns new connection and an action to get chunks already sent -/
+def Connection.listener (connection : Connection) : IO (Connection × IO (List ByteArray)) := do
+  let ref ← IO.mkRef []
+  let connection' := { connection with
+    send := λ chunk => do
+      ref.modify λ content => chunk :: content
+    : Connection
+  }
+  pure (connection', List.reverse <$> ref.get)

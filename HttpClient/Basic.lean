@@ -29,14 +29,9 @@ def toRequestString [ToString T] (r : Http.Request T) : String :=
   Http.CRLF ++
   toString r.body
 
-def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http.Response String) := do
-  -- parse the URL
-  let uri ← match Http.URI.parse.run url with
-    | .ok ss r => if ss.isEmpty then pure r else throw (IO.userError s!"parse url: leftofer {ss}")
-    | .error e => throw (IO.userError s!"parse url: {e}")
-
+def connect (uri : Http.URI) : IO Connection := do
   let auth ← match uri.auth with
-    | .none => throw (IO.userError s!"url without host {url}")
+    | .none => throw (IO.userError s!"url without host {uri}")
     | .some auth => pure auth
   let host := auth.host
   let service := match auth.port with
@@ -45,33 +40,10 @@ def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http
 
   -- call getaddrinfo(3) to resolve the host
   let addrs ← AddrInfo.getAddrInfo host service
-  -- IO.println s!"{addrs}"
   let addrInfo ← do
     match addrs.head? with
     | none => throw (IO.userError "no address!")
     | some a => pure a
-
-  -- build the request
-  let request := {
-    method := match method with
-      | .GET => .GET
-      | .POST => .POST
-    url := {
-      scheme := none
-      auth := none
-      path := uri.path
-      query := uri.query
-      fragment := uri.fragment
-      : Http.URI
-    }
-    version := .HTTP_1_0
-    headers := Http.Headers.add .empty (.standard Http.HeaderName.Standard.HOST) host
-    body := match body with
-      | .none => ""
-      | .some b => String.fromUTF8Unchecked b -- XXX
-    : Http.Request String
-  }
-  IO.println s!"sending request\n{toRequestString request}\nend request"
 
   -- connect
   let connection ← do
@@ -88,19 +60,59 @@ def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http
       sock.close
       throw e
 
-  -- send the request
-  let resp ←
-    try
-      connection.send (toRequestString request).toUTF8
-      connection.readAll
-    finally
-      connection.close
+def method' (connection : Connection) (method : Method) (uri : Http.URI) (body : Option ByteArray) : IO (Http.Response String) := do
+  let auth ← match uri.auth with
+    | .none => throw (IO.userError s!"uri without host {uri}")
+    | .some auth => pure auth
+  let host := auth.host
+
+  -- build the request
+  let request := {
+    method := match method with
+      | .GET => .GET
+      | .POST => .POST
+    url := {
+      scheme := none
+      auth := none
+      path := uri.path
+      query := uri.query
+      fragment := uri.fragment
+      : Http.URI
+    }
+    version := .HTTP_1_1
+    headers := Http.Headers.fromList
+      [ (.standard Http.HeaderName.Standard.HOST
+        , host
+        )
+      , ( .standard Http.HeaderName.Standard.CONNECTION
+        , "close"
+        )
+      ]
+    body := match body with
+      | .none => ""
+      | .some b => String.fromUTF8Unchecked b -- XXX
+    : Http.Request String
+  }
+  -- IO.println s!"sending request\n{toRequestString request}\nend request"
+
+  connection.send (toRequestString request).toUTF8
+  let resp ← connection.readAll
   -- IO.println s!"response:\n{String.fromUTF8Unchecked resp}\nend response"
 
   let responseParser := Http.Response.parse (pure ())
   match responseParser.run (String.fromUTF8Unchecked resp) with
   | .ok body resp => pure {resp with body := body.toString}
   | .error e => throw (IO.userError s!"can't parse response {e}")
+
+def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http.Response String) := do
+  let uri ← match Http.URI.parse.run url with
+    | .ok ss r => if ss.isEmpty then pure r else throw (IO.userError s!"parse url: leftofer {ss}")
+    | .error e => throw (IO.userError s!"parse url: {e}")
+  let connection ← connect uri
+  try
+    method' connection method uri body
+  finally
+    connection.close
 
 def get (url : String) : IO String := do
   let response ← method .GET url .none
