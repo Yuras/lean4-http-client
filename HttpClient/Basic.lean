@@ -29,10 +29,25 @@ def toRequestString [ToString T] (r : Http.Request T) : String :=
   Http.CRLF ++
   toString r.body
 
-def connect (uri : Http.URI) : IO Connection := do
-  let auth ← match uri.auth with
-    | .none => throw (IO.userError s!"url without host {uri}")
-    | .some auth => pure auth
+
+structure URI where
+  uri : Http.URI
+  hasAuth : uri.auth.isSome = true
+
+def parseUrl (url : String) : Except String URI :=
+  match Http.URI.parse.run url with
+    | .ok ss r => if ss.isEmpty
+      then if _ : r.auth.isSome
+        then .ok {
+          uri := r
+          hasAuth := by assumption
+        }
+        else .error s!"no authority in {url}"
+      else .error s!"leftofer when parsing url {url}: {ss}"
+    | .error e => .error (toString e)
+
+def connect (uri : URI) : IO Connection := do
+  let auth := uri.uri.auth.get uri.hasAuth
   let host := auth.host
   let service := match auth.port with
     | .none => "http"
@@ -60,10 +75,8 @@ def connect (uri : Http.URI) : IO Connection := do
       sock.close
       throw e
 
-def method' (connection : Connection) (method : Method) (uri : Http.URI) (body : Option ByteArray) : IO (Http.Response String) := do
-  let auth ← match uri.auth with
-    | .none => throw (IO.userError s!"uri without host {uri}")
-    | .some auth => pure auth
+def method' (connection : Connection) (method : Method) (uri : URI) (body : Option ByteArray) : IO (Http.Response String) := do
+  let auth := uri.uri.auth.get uri.hasAuth
   let host := auth.host
 
   -- build the request
@@ -74,9 +87,9 @@ def method' (connection : Connection) (method : Method) (uri : Http.URI) (body :
     url := {
       scheme := none
       auth := none
-      path := uri.path
-      query := uri.query
-      fragment := uri.fragment
+      path := uri.uri.path
+      query := uri.uri.query
+      fragment := uri.uri.fragment
       : Http.URI
     }
     version := .HTTP_1_1
@@ -105,9 +118,9 @@ def method' (connection : Connection) (method : Method) (uri : Http.URI) (body :
   | .error e => throw (IO.userError s!"can't parse response {e}")
 
 def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http.Response String) := do
-  let uri ← match Http.URI.parse.run url with
-    | .ok ss r => if ss.isEmpty then pure r else throw (IO.userError s!"parse url: leftofer {ss}")
-    | .error e => throw (IO.userError s!"parse url: {e}")
+  let uri ← match parseUrl url with
+    | .ok res => pure res
+    | .error err => throw (IO.userError err)
   let connection ← connect uri
   try
     method' connection method uri body

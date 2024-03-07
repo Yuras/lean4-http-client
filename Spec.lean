@@ -68,9 +68,9 @@ def connectionSpec : IO Unit := do
 def methodSpec : IO Unit := do
   let emptyResponse := "HTTP/1.1 200 OK\n\n".toUTF8
   let url := "http://localhost:80"
-  let uri ← match Http.URI.parse.run url with
-    | .ok ss r => if ss.isEmpty then pure r else throw (IO.userError s!"parse url: leftofer {ss}")
-    | .error e => throw (IO.userError s!"parse url: {e}")
+  let uri ← match HttpClient.parseUrl url with
+    | .ok res => pure res
+    | .error err => throw (IO.userError err)
   case "sends correct request" do
     let expected := "GET / HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\n\r\n"
     let (c, listener) ← do
