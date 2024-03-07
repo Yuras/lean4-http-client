@@ -1,6 +1,8 @@
 
 import Mathlib
 
+namespace Local
+
 structure Conn where
   receive : IO (Option ByteArray)
   push : ByteArray -> IO Unit
@@ -62,3 +64,5 @@ theorem push_receive
   := by
   unfold Conn.make
   simp [mk_get, mk_set, mk_alone]
+
+end Local
