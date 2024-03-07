@@ -77,7 +77,7 @@ def connect (uri : URI) : IO Connection := do
 
 def method' (connection : Connection) (method : Method) (uri : URI) (body : Option ByteArray) : IO (Http.Response String) := do
   let auth := uri.uri.auth.get uri.hasAuth
-  let host := auth.host
+  let host := toString auth
 
   -- build the request
   let request := {
