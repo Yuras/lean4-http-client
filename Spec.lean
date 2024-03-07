@@ -65,7 +65,7 @@ def connectionSpec : IO Unit := do
     let r ← listener
     pure (r.map String.fromUTF8Unchecked == ["AB", "C"])
 
-def methodSpec : IO Unit := do
+def runRequestSpec : IO Unit := do
   let emptyResponse := "HTTP/1.1 200 OK\n\n".toUTF8
   let url := "http://localhost:8080/test"
   let uri ← match HttpClient.parseUrl url with
@@ -77,11 +77,11 @@ def methodSpec : IO Unit := do
     let (c, listener) ← do
       let c ← Connection.makeFromList [emptyResponse]
       c.listener
-    let _ ← HttpClient.method' c .GET uri .none
+    let _ ← HttpClient.Internal.runRequest c (HttpClient.Request.mk .GET uri .none)
     let sent ← listener
     pure (String.fromUTF8Unchecked sent.concatenate == expected)
 
 def main : IO Unit := do
   refSpec
   connectionSpec
-  methodSpec
+  runRequestSpec

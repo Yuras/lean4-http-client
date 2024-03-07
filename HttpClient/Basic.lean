@@ -10,6 +10,29 @@ inductive Method where
   | GET
   | POST
 
+structure URI where
+  uri : Http.URI
+  hasAuth : uri.auth.isSome = true
+
+def parseUrl (url : String) : Except String URI :=
+  match Http.URI.parse.run url with
+    | .ok ss r => if ss.isEmpty
+      then if _ : r.auth.isSome
+        then .ok {
+          uri := r
+          hasAuth := by assumption
+        }
+        else .error s!"no authority in {url}"
+      else .error s!"leftofer when parsing url {url}: {ss}"
+    | .error e => .error (toString e)
+
+structure Request where
+  method : Method
+  uri : URI
+  body : Option ByteArray
+
+namespace Internal
+
 def renderPath (uri : Http.URI) : String :=
   path ++ query
   where
@@ -28,23 +51,6 @@ def toRequestString [ToString T] (r : Http.Request T) : String :=
   r.headers.toRequestFormat ++
   Http.CRLF ++
   toString r.body
-
-
-structure URI where
-  uri : Http.URI
-  hasAuth : uri.auth.isSome = true
-
-def parseUrl (url : String) : Except String URI :=
-  match Http.URI.parse.run url with
-    | .ok ss r => if ss.isEmpty
-      then if _ : r.auth.isSome
-        then .ok {
-          uri := r
-          hasAuth := by assumption
-        }
-        else .error s!"no authority in {url}"
-      else .error s!"leftofer when parsing url {url}: {ss}"
-    | .error e => .error (toString e)
 
 def connect (uri : URI) : IO Connection := do
   let auth := uri.uri.auth.get uri.hasAuth
@@ -75,21 +81,23 @@ def connect (uri : URI) : IO Connection := do
       sock.close
       throw e
 
-def method' (connection : Connection) (method : Method) (uri : URI) (body : Option ByteArray) : IO (Http.Response String) := do
-  let auth := uri.uri.auth.get uri.hasAuth
+def runRequest (connection : Connection) (request : Request)
+  : IO (Http.Response String) := do
+  let uri := request.uri.uri
+  let auth := uri.auth.get request.uri.hasAuth
   let host := toString auth
 
   -- build the request
   let request := {
-    method := match method with
+    method := match request.method with
       | .GET => .GET
       | .POST => .POST
     url := {
       scheme := none
       auth := none
-      path := uri.uri.path
-      query := uri.uri.query
-      fragment := uri.uri.fragment
+      path := uri.path
+      query := uri.query
+      fragment := uri.fragment
       : Http.URI
     }
     version := .HTTP_1_1
@@ -101,14 +109,14 @@ def method' (connection : Connection) (method : Method) (uri : URI) (body : Opti
         , "close"
         )
       ]
-    body := match body with
+    body := match request.body with
       | .none => ""
       | .some b => String.fromUTF8Unchecked b -- XXX
     : Http.Request String
   }
   -- IO.println s!"sending request\n{toRequestString request}\nend request"
 
-  connection.send (toRequestString request).toUTF8
+  connection.send (Internal.toRequestString request).toUTF8
   let resp ← connection.readAll
   -- IO.println s!"response:\n{String.fromUTF8Unchecked resp}\nend response"
 
@@ -117,22 +125,6 @@ def method' (connection : Connection) (method : Method) (uri : URI) (body : Opti
   | .ok body resp => pure {resp with body := body.toString}
   | .error e => throw (IO.userError s!"can't parse response {e}")
 
-def method (method : Method) (url : String) (body : Option ByteArray) : IO (Http.Response String) := do
-  let uri ← match parseUrl url with
-    | .ok res => pure res
-    | .error err => throw (IO.userError err)
-  let connection ← connect uri
-  try
-    method' connection method uri body
-  finally
-    connection.close
-
-def get (url : String) : IO String := do
-  let response ← method .GET url .none
-  pure (response.body)
-
-def post (url : String) (body : ByteArray) : IO String := do
-  let response ← method .POST url body
-  pure (response.body)
+end Internal
 
 end HttpClient
