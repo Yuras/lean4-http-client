@@ -1,10 +1,15 @@
 
+import Mathlib
+
 structure Conn where
   receive : IO (Option ByteArray)
   push : ByteArray -> IO Unit
 
+def mkRef {T : Type} (a : T) : IO (IO.Ref T):= do
+  IO.mkRef a
+
 def Conn.make (receive_ : IO (Option ByteArray)) : IO Conn := do
-  let memRef ← IO.mkRef []
+  let memRef ← mkRef []
   pure {
     receive := do
       match ← memRef.get with
@@ -13,7 +18,8 @@ def Conn.make (receive_ : IO (Option ByteArray)) : IO Conn := do
           memRef.set rest
           pure (.some chunk)
     push := λ chunk => do
-      memRef.modify λ l => .cons chunk l
+      let l ← memRef.get
+      memRef.set (chunk :: l)
     : Conn
   }
 
@@ -27,6 +33,32 @@ def Conn.make (receive_ : IO (Option ByteArray)) : IO Conn := do
   let res2 ← c.receive
   pure ([res1, res2].map (Option.map String.fromUTF8Unchecked))
 
-theorem push_receive (receive_ : IO (Option ByteArray)) (chunk : ByteArray)
-  : (Conn.make receive_ >>= λ conn => conn.push chunk >>= λ _ => conn.receive) = pure chunk := by
-  sorry
+
+axiom mk_get {T M : Type} {a : T} {x : IO.Ref T → T → IO M}: (do
+  let r ← mkRef a
+  let v ← r.get
+  x r v
+  )=(do
+  let r ← mkRef a
+  x r a)
+
+axiom mk_set {T M : Type} {a b : T} {x : IO.Ref T → IO M}: (do
+  let r ← mkRef a
+  r.set b
+  x r
+  )=(do
+  let r ← mkRef b
+  x r)
+
+axiom mk_alone {T M : Type} {a : T} {x : IO M}: (do
+  let _ ← mkRef a
+  x) = x
+
+theorem push_receive
+  (receive_ : IO (Option ByteArray))
+  (chunk : ByteArray) :
+  (Conn.make receive_ >>= λ conn => conn.push chunk >>= λ _ => conn.receive)
+    = pure (.some chunk)
+  := by
+  unfold Conn.make
+  simp [mk_get, mk_set, mk_alone]
