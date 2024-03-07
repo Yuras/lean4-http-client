@@ -4,12 +4,12 @@ Status: not designed for any serious use, at least not yet
 
 Example
 
-```lean4
+```lean
 import «HttpClient»
 
 def main : IO Unit := do
   let response ← HttpClient.get "http://localhost:8080/test"
-  IO.println s!"{response}"
+  IO.println response
 ```
 
-For more control, use `HttpClient.runRequest`.
+For more control, use `HttpClient.runRequest`
