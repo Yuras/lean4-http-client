@@ -104,7 +104,7 @@ axiom mk_alone {T M : Type} {a : T} {x : IO M}: (do
   let _ ← mkRef a
   x) = x
 
-axiom mk_IO_comm {T1 T2 M N : Type} {a : T1} {b : T2} {y : IO N} {x : IO.Ref T1 → N → IO M}
+axiom mk_IO_comm {T M N : Type} (a : T) (y : IO N) (x : IO.Ref T → N → IO M)
   : (do
   let r ← mkRef a
   let v ← y
@@ -121,7 +121,7 @@ theorem mk_mk_comm {T1 T2 M : Type} {a : T1} {b : T2} {x : IO.Ref T1 → IO.Ref 
   let r2 ← mkRef b
   let r1 ← mkRef a
   x r1 r2) := by
-    rewrite [@mk_IO_comm _ _ _ _ _ b]
+    rewrite [mk_IO_comm]
     rfl
 
 theorem push_receive
@@ -153,3 +153,48 @@ theorem close
   := by
   unfold Connection.make
   simp [mk_get, mk_set, mk_alone, lift_mk]
+
+/-
+axiom mk_IO_comm_ {T M N K : Type} (z : IO K) (a : T) (y : IO N) (x : IO.Ref T → N → K → IO M)
+  : (do
+  let k ← z
+  let r ← mkRef a
+  let v ← y
+  x r v k) = (do
+  let k ← z
+  let v ← y
+  let r ← mkRef a
+  x r v k)
+
+theorem mk_IO_comm__ {T M N K : Type} (z : IO K) (a : T) (y : IO N) (x : IO.Ref T → N → K → IO M)
+  : (do
+  let k ← z
+  let r ← mkRef a
+  let v ← y
+  x r v k) = (do
+  let k ← z
+  let v ← y
+  let r ← mkRef a
+  x r v k) := by
+  sorry
+-/
+
+theorem receive_twice
+  (send_ : ByteArray → IO Unit)
+  (receive_ : IO (Option ByteArray))
+  (close_ : IO Unit)
+  (h : receive_ = pure .none):
+  (do
+    let conn ← Connection.make send_ receive_ close_
+    let _ ← conn.receive
+    conn.receive)
+    = pure .none
+  := by
+  unfold Connection.make
+  simp [mk_get, mk_set, mk_alone, lift_mk]
+  rewrite [mk_mk_comm]
+  simp [mk_get, mk_set, mk_alone]
+  rewrite [h]
+  simp [mk_get, mk_set, mk_alone]
+  rewrite [mk_mk_comm]
+  simp [mk_get, mk_set, mk_alone]
