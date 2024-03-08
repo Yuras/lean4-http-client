@@ -80,10 +80,12 @@ partial def Connection.readAll (c : Connection) : IO ByteArray := go []
 def mkRef {T : Type} (a : T) : IO (IO.Ref T):= do
   IO.mkRef a
 
+@[simp]
 theorem lift_mk : liftM (IO.mkRef a) = mkRef a := by
   unfold mkRef
   rfl
 
+@[simp]
 axiom mk_get {T M : Type} {a : T} {x : IO.Ref T → T → IO M}: (do
   let r ← mkRef a
   let v ← r.get
@@ -92,6 +94,7 @@ axiom mk_get {T M : Type} {a : T} {x : IO.Ref T → T → IO M}: (do
   let r ← mkRef a
   x r a)
 
+@[simp]
 axiom mk_set {T M : Type} {a b : T} {x : IO.Ref T → IO M}: (do
   let r ← mkRef a
   r.set b
@@ -100,11 +103,12 @@ axiom mk_set {T M : Type} {a b : T} {x : IO.Ref T → IO M}: (do
   let r ← mkRef b
   x r)
 
+@[simp]
 axiom mk_alone {T M : Type} {a : T} {x : IO M}: (do
   let _ ← mkRef a
   x) = x
 
-axiom mk_IO_comm {T M N : Type} (a : T) (y : IO N) (x : IO.Ref T → N → IO M)
+axiom mk_io_comm {T M N : Type} (a : T) (y : IO N) (x : IO.Ref T → N → IO M)
   : (do
   let r ← mkRef a
   let v ← y
@@ -121,7 +125,7 @@ theorem mk_mk_comm {T1 T2 M : Type} {a : T1} {b : T2} {x : IO.Ref T1 → IO.Ref 
   let r2 ← mkRef b
   let r1 ← mkRef a
   x r1 r2) := by
-    rewrite [mk_IO_comm]
+    rewrite [mk_io_comm]
     rfl
 
 theorem push_receive
@@ -136,11 +140,11 @@ theorem push_receive
     = pure (.some chunk)
   := by
   unfold Connection.make
-  simp [mk_get, mk_set, mk_alone, lift_mk]
+  simp
   rewrite [mk_mk_comm]
-  simp [mk_get, mk_set, mk_alone]
+  simp
   rewrite [mk_mk_comm]
-  simp [mk_get, mk_set, mk_alone]
+  simp
 
 theorem close
   (send_ : ByteArray → IO Unit)
@@ -152,7 +156,7 @@ theorem close
     = close_
   := by
   unfold Connection.make
-  simp [mk_get, mk_set, mk_alone, lift_mk]
+  simp
 
 /-
 axiom mk_IO_comm_ {T M N K : Type} (z : IO K) (a : T) (y : IO N) (x : IO.Ref T → N → K → IO M)
@@ -191,10 +195,10 @@ theorem receive_twice
     = pure .none
   := by
   unfold Connection.make
-  simp [mk_get, mk_set, mk_alone, lift_mk]
+  simp
   rewrite [mk_mk_comm]
-  simp [mk_get, mk_set, mk_alone]
+  simp
   rewrite [h]
-  simp [mk_get, mk_set, mk_alone]
+  simp
   rewrite [mk_mk_comm]
-  simp [mk_get, mk_set, mk_alone]
+  simp
