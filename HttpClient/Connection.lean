@@ -128,6 +128,21 @@ theorem mk_mk_comm {T1 T2 M : Type} {a : T1} {b : T2} {x : IO.Ref T1 → IO.Ref 
     rewrite [mk_io_comm]
     rfl
 
+theorem mk_io_comm_ {T M N K : Type} (z : IO K) (a : T) (y : IO N) (x : IO.Ref T → N → K → IO M)
+  : (do
+  let k ← z
+  let r ← mkRef a
+  let v ← y
+  x r v k) = (do
+  let k ← z
+  let v ← y
+  let r ← mkRef a
+  x r v k)
+  := by
+    refine bind_congr ?h
+    intro k
+    exact mk_io_comm a y fun r v => x r v k
+
 theorem push_receive
   (send_ : ByteArray → IO Unit)
   (receive_ : IO (Option ByteArray))
@@ -157,31 +172,6 @@ theorem close
   := by
   unfold Connection.make
   simp
-
-/-
-axiom mk_IO_comm_ {T M N K : Type} (z : IO K) (a : T) (y : IO N) (x : IO.Ref T → N → K → IO M)
-  : (do
-  let k ← z
-  let r ← mkRef a
-  let v ← y
-  x r v k) = (do
-  let k ← z
-  let v ← y
-  let r ← mkRef a
-  x r v k)
-
-theorem mk_IO_comm__ {T M N K : Type} (z : IO K) (a : T) (y : IO N) (x : IO.Ref T → N → K → IO M)
-  : (do
-  let k ← z
-  let r ← mkRef a
-  let v ← y
-  x r v k) = (do
-  let k ← z
-  let v ← y
-  let r ← mkRef a
-  x r v k) := by
-  sorry
--/
 
 theorem receive_twice
   (send_ : ByteArray → IO Unit)
@@ -246,4 +236,24 @@ theorem receive_empty
     unfold ByteArray.isEmpty
     simp
   rewrite [empty]
+  simp
+
+theorem receive_once
+  (send_ : ByteArray → IO Unit)
+  (receive_ : IO (Option ByteArray))
+  (close_ : IO Unit) :
+  (do
+    let conn ← Connection.make send_ receive_ close_
+    conn.receive)
+    = (do
+    let mc ← receive_
+    match mc with
+    |  .none => pure .none
+    |  .some c =>
+      if ByteArray.isEmpty c
+        then pure .none
+        else pure (.some c)
+    )
+  := by
+  unfold Connection.make
   simp
