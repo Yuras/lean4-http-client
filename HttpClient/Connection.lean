@@ -7,16 +7,13 @@ structure Connection where
   push : ByteArray -> IO Unit
   close : IO Unit
 
-def mkRef {T : Type} (a : T) : IO (IO.Ref T):= do
-  IO.mkRef a
-
 def Connection.make
   (send_ : ByteArray -> IO Unit)
   (receive_ : IO (Option ByteArray))
   (close_ : IO Unit)
   : IO Connection := do
-  let memRef ← mkRef []
-  let closedRef ← mkRef false
+  let memRef ← IO.mkRef []
+  let closedRef ← IO.mkRef false
   let checkClosed : IO Unit := do
     if ← closedRef.get
       then throw (IO.userError "connection closed")
@@ -53,7 +50,7 @@ def Connection.make
   }
 
 def Connectin.makeFromList (list : List ByteArray) : IO Connection := do
-  let ref ← mkRef list
+  let ref ← IO.mkRef list
   let send _ := pure ()
   let receive := do
     match ← ref.get with
@@ -79,6 +76,13 @@ partial def Connection.readAll (c : Connection) : IO ByteArray := go []
   let res1 ← c.receive
   let res2 ← c.receive
   pure ([res1, res2].map (Option.map String.fromUTF8Unchecked))
+
+def mkRef {T : Type} (a : T) : IO (IO.Ref T):= do
+  IO.mkRef a
+
+theorem lift_mk : liftM (IO.mkRef a) = mkRef a := by
+  unfold mkRef
+  rfl
 
 axiom mk_get {T M : Type} {a : T} {x : IO.Ref T → T → IO M}: (do
   let r ← mkRef a
@@ -132,7 +136,7 @@ theorem push_receive
     = pure (.some chunk)
   := by
   unfold Connection.make
-  simp [mk_get, mk_set, mk_alone]
+  simp [mk_get, mk_set, mk_alone, lift_mk]
   rewrite [mk_mk_comm]
   simp [mk_get, mk_set, mk_alone]
   rewrite [mk_mk_comm]
@@ -148,4 +152,4 @@ theorem close
     = close_
   := by
   unfold Connection.make
-  simp [mk_get, mk_set, mk_alone]
+  simp [mk_get, mk_set, mk_alone, lift_mk]
