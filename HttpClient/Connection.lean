@@ -202,3 +202,48 @@ theorem receive_twice
   simp
   rewrite [mk_mk_comm]
   simp
+
+theorem receive
+  (send_ : ByteArray → IO Unit)
+  (receive_ : IO (Option ByteArray))
+  (close_ : IO Unit)
+  (res : Option ByteArray)
+  (h1 : res.map ByteArray.isEmpty ≠ .some true)
+  (h : receive_ = pure res):
+  (do
+    let conn ← Connection.make send_ receive_ close_
+    conn.receive)
+    = receive_
+  := by
+  unfold Connection.make
+  simp
+  rewrite [h]
+  simp
+  cases res
+  simp
+  simp
+  simp at h1
+  intro h2
+  absurd h1
+  simp
+  assumption
+
+theorem receive_empty
+  (send_ : ByteArray → IO Unit)
+  (receive_ : IO (Option ByteArray))
+  (close_ : IO Unit)
+  (h : receive_ = pure (.some ByteArray.empty)):
+  (do
+    let conn ← Connection.make send_ receive_ close_
+    conn.receive)
+    = pure .none
+  := by
+  unfold Connection.make
+  simp
+  rewrite [h]
+  simp
+  have empty : ByteArray.isEmpty ByteArray.empty := by
+    unfold ByteArray.isEmpty
+    simp
+  rewrite [empty]
+  simp
