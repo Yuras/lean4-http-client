@@ -37,9 +37,7 @@ def Connection.make
           pure (.some chunk)
     push := λ chunk => do
       checkClosed
-      let l ← memRef.get
-      memRef.set (chunk :: l)
-      -- memRef.modify λ l => .cons chunk l
+      memRef.modify λ l => .cons chunk l
     close := do
       if ← closedRef.get
         then pure ()
@@ -116,6 +114,13 @@ axiom mk_io_comm {T M N : Type} (a : T) (y : IO N) (x : IO.Ref T → N → IO M)
   let v ← y
   let r ← mkRef a
   x r v)
+
+@[simp]
+axiom modify_get_set
+  {T : Type}
+  (r : IO.Ref T)
+  (f : T -> T)
+  : r.modify f = (r.get >>= λ v => r.set (f v) : IO Unit)
 
 theorem mk_mk_comm {T1 T2 M : Type} {a : T1} {b : T2} {x : IO.Ref T1 → IO.Ref T2 → IO M}
   : (do
