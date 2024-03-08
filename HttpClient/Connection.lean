@@ -75,45 +75,37 @@ partial def Connection.readAll (c : Connection) : IO ByteArray := go []
   let res2 ← c.receive
   pure ([res1, res2].map (Option.map String.fromUTF8Unchecked))
 
-def mkRef {T : Type} (a : T) : IO (IO.Ref T):= do
-  IO.mkRef a
-
-@[simp]
-theorem lift_mk : liftM (IO.mkRef a) = mkRef a := by
-  unfold mkRef
-  rfl
-
 @[simp]
 axiom mk_get {T M : Type} {a : T} {x : IO.Ref T → T → IO M}: (do
-  let r ← mkRef a
+  let r ← IO.mkRef a
   let v ← r.get
   x r v
   )=(do
-  let r ← mkRef a
-  x r a)
+  let r ← IO.mkRef a
+  x r a : IO M)
 
 @[simp]
 axiom mk_set {T M : Type} {a b : T} {x : IO.Ref T → IO M}: (do
-  let r ← mkRef a
+  let r ← IO.mkRef a
   r.set b
   x r
   )=(do
-  let r ← mkRef b
-  x r)
+  let r ← IO.mkRef b
+  x r : IO M)
 
 @[simp]
 axiom mk_alone {T M : Type} {a : T} {x : IO M}: (do
-  let _ ← mkRef a
+  let _ ← IO.mkRef a
   x) = x
 
 axiom mk_io_comm {T M N : Type} (a : T) (y : IO N) (x : IO.Ref T → N → IO M)
   : (do
-  let r ← mkRef a
+  let r ← IO.mkRef a
   let v ← y
   x r v) = (do
   let v ← y
-  let r ← mkRef a
-  x r v)
+  let r ← IO.mkRef a
+  x r v : IO M)
 
 @[simp]
 axiom modify_get_set
@@ -124,24 +116,24 @@ axiom modify_get_set
 
 theorem mk_mk_comm {T1 T2 M : Type} {a : T1} {b : T2} {x : IO.Ref T1 → IO.Ref T2 → IO M}
   : (do
-  let r1 ← mkRef a
-  let r2 ← mkRef b
+  let r1 ← IO.mkRef a
+  let r2 ← IO.mkRef b
   x r1 r2) = (do
-  let r2 ← mkRef b
-  let r1 ← mkRef a
-  x r1 r2) := by
+  let r2 ← IO.mkRef b
+  let r1 ← IO.mkRef a
+  x r1 r2 : IO M) := by
     rewrite [mk_io_comm]
     rfl
 
 theorem mk_io_comm_ {T M N K : Type} (z : IO K) (a : T) (y : IO N) (x : IO.Ref T → N → K → IO M)
   : (do
   let k ← z
-  let r ← mkRef a
+  let r ← IO.mkRef a
   let v ← y
   x r v k) = (do
   let k ← z
   let v ← y
-  let r ← mkRef a
+  let r ← IO.mkRef a
   x r v k)
   := by
     refine bind_congr ?h
