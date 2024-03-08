@@ -70,6 +70,16 @@ partial def Connection.readAll (c : Connection) : IO ByteArray := go []
     | .none => pure (res.reverse.foldl (fun a b => a.append b) ByteArray.empty)
     | .some chunk => go (chunk :: res)
 
+#eval unsafeIO $ do
+  let c ← Connection.make (λ _ => pure ()) (pure .none) (pure ())
+  c.receive
+#eval unsafeIO $ do
+  let c ← Connection.make (λ _ => pure ()) (pure .none) (pure ())
+  c.push "hello".toUTF8
+  let res1 ← c.receive
+  let res2 ← c.receive
+  pure ([res1, res2].map (Option.map String.fromUTF8Unchecked))
+
 axiom mk_get {T M : Type} {a : T} {x : IO.Ref T → T → IO M}: (do
   let r ← mkRef a
   let v ← r.get
@@ -90,26 +100,52 @@ axiom mk_alone {T M : Type} {a : T} {x : IO M}: (do
   let _ ← mkRef a
   x) = x
 
-axiom mk_comm {T1 T2 M : Type} {a : T1} {b : T2} {x : IO.Ref T1 → IO.Ref T2 → IO M}
+axiom mk_IO_comm {T1 T2 M N : Type} {a : T1} {b : T2} {y : IO N} {x : IO.Ref T1 → N → IO M}
+  : (do
+  let r ← mkRef a
+  let v ← y
+  x r v) = (do
+  let v ← y
+  let r ← mkRef a
+  x r v)
+
+theorem mk_mk_comm {T1 T2 M : Type} {a : T1} {b : T2} {x : IO.Ref T1 → IO.Ref T2 → IO M}
   : (do
   let r1 ← mkRef a
   let r2 ← mkRef b
   x r1 r2) = (do
   let r2 ← mkRef b
   let r1 ← mkRef a
-  x r1 r2)
+  x r1 r2) := by
+    rewrite [@mk_IO_comm _ _ _ _ _ b]
+    rfl
 
 theorem push_receive
   (send_ : ByteArray → IO Unit)
   (receive_ : IO (Option ByteArray))
   (close_ : IO Unit)
   (chunk : ByteArray) :
-  (Connection.make send_ receive_ close_ >>= λ conn => conn.push chunk >>= λ _ => conn.receive)
+  (do
+    let conn ← Connection.make send_ receive_ close_
+    conn.push chunk
+    conn.receive)
     = pure (.some chunk)
   := by
   unfold Connection.make
   simp [mk_get, mk_set, mk_alone]
-  rewrite [mk_comm]
+  rewrite [mk_mk_comm]
   simp [mk_get, mk_set, mk_alone]
-  rewrite [mk_comm]
+  rewrite [mk_mk_comm]
+  simp [mk_get, mk_set, mk_alone]
+
+theorem close
+  (send_ : ByteArray → IO Unit)
+  (receive_ : IO (Option ByteArray))
+  (close_ : IO Unit):
+  (do
+    let conn ← Connection.make send_ receive_ close_
+    conn.close)
+    = close_
+  := by
+  unfold Connection.make
   simp [mk_get, mk_set, mk_alone]
