@@ -254,3 +254,24 @@ theorem receive_once
   := by
   unfold Connection.make
   simp
+
+theorem receive_comm
+  (send_ : ByteArray → IO Unit)
+  (receive_ : IO (Option ByteArray))
+  (close_ : IO Unit)
+  (x : IO T)
+  (y : Connection → T → IO R):
+  (do
+    let conn ← Connection.make send_ receive_ close_
+    let v ← x
+    y conn v)
+  = (do
+    let v ← x
+    let conn ← Connection.make send_ receive_ close_
+    y conn v)
+  := by
+    unfold Connection.make
+    simp
+    rewrite [mk_io_comm_]
+    rewrite [mk_io_comm]
+    simp
