@@ -1,8 +1,8 @@
 
-import «Http»
-import «Socket»
-import «HttpClient».AddrInfo
-import «HttpClient».Connection
+import Http
+import Socket
+import HttpClient.AddrInfo
+import HttpClient.Connection
 
 namespace HttpClient
 

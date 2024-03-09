@@ -4,6 +4,7 @@ open Lake DSL
 require Http from git "https://github.com/Yuras/lean4-http" @ "http-client"
 require socket from git "https://github.com/hargoniX/socket.lean" @ "main"
 require soda from git "https://github.com/algebraic-sofia/soda" @ "main"
+require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "stable"
 
 package «http-client» where
   -- add package configuration options here

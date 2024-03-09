@@ -1,6 +1,6 @@
-import «Http»
-import «HttpClient»
-import «HttpClient».Connection
+import Http
+import HttpClient
+import HttpClient.Connection
 
 def List.concatenate [Append a] [Inhabited a] (l : List a) : a :=
   l.foldl (. ++ .) default

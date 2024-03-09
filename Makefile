@@ -1,4 +1,4 @@
-all:
+build:
 	lake build
 
 run:
@@ -6,3 +6,5 @@ run:
 
 test:
 	lake exec http-client-spec
+
+.PHONY: build run test

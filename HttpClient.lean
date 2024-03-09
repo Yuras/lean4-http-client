@@ -1,4 +1,4 @@
-import «HttpClient».Basic
+import HttpClient.Basic
 
 namespace HttpClient
 
