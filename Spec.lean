@@ -1,6 +1,7 @@
 import Http
 import HttpClient
 import HttpClient.Connection
+import HttpClient.ConnectionTheorems
 
 def List.concatenate [Append a] [Inhabited a] (l : List a) : a :=
   l.foldl (. ++ .) default
