@@ -2,7 +2,7 @@ import Lake
 open Lake DSL
 
 require Http from git "https://github.com/Yuras/lean4-http" @ "http-client"
-require socket from git "https://github.com/hargoniX/socket.lean" @ "main"
+require socket from git "https://github.com/Yuras/socket.lean.git" @ "wip/yuras/get_fd"
 require soda from git "https://github.com/algebraic-sofia/soda" @ "main"
 require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "stable"
 
