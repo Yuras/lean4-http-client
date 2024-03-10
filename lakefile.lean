@@ -15,9 +15,11 @@ lean_lib «HttpClient» where
 @[default_target]
 lean_exe «http-client-main» where
   root := `Main
+  moreLinkArgs := #["-lssl"]
 
 lean_exe «http-client-spec» where
   root := `Spec
+  moreLinkArgs := #["-lssl"]
 
 target http.o pkg : FilePath := do
   let oFile := pkg.buildDir / "native" / "http.o"

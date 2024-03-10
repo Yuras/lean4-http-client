@@ -127,4 +127,49 @@ def runRequest (connection : Connection) (request : Request)
 
 end Internal
 
+opaque SSLConnection : Type
+
+@[extern "ssl_connection_create"]
+opaque SSLConnection.create : UInt32 → IO SSLConnection
+
+@[extern "ssl_connection_connect"]
+opaque SSLConnection.connect : SSLConnection → IO Unit
+
+@[extern "ssl_connection_write"]
+opaque SSLConnection.write : SSLConnection → ByteArray → IO Unit
+
+@[extern "ssl_connection_read"]
+opaque SSLConnection.read : SSLConnection → UInt32 → IO ByteArray
+
+def testSSL : IO Unit := do
+
+  let uri ← match parseUrl "https://www.google.com" with
+    | .ok res => pure res
+    | .error err => throw (IO.userError err)
+  let request := {
+    method := .GET
+    uri := uri
+    body := .none
+    : Request
+  }
+
+  -- call getaddrinfo(3) to resolve the host
+  let addrs ← AddrInfo.getAddrInfo "www.google.com" "https"
+  let addrInfo ← do
+    match addrs.head? with
+    | none => throw (IO.userError "no address!")
+    | some a => pure a
+
+  -- connect
+  let addr := match addrInfo with
+    | .inet host port => Socket.SockAddr4.v4 host port
+  let sock ← Socket.mk .inet .stream
+  sock.connect addr
+  let sslConnection ← SSLConnection.create sock.getFd
+  sslConnection.connect
+
+  let connection ← Connection.make sslConnection.write (.some <$> sslConnection.read 4096) sock.close
+  let res ← Internal.runRequest connection request
+  IO.println s!"{res.toString}"
+
 end HttpClient
