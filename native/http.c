@@ -139,7 +139,9 @@ lean_obj_res ssl_connection_connect(lean_obj_arg lean_connection) {
 	struct ssl_connection* connection = lean_get_external_data(lean_connection);
 	int err = SSL_connect(connection->ssl);
 	if (err < 0) {
-		return lean_mk_io_error_other_error(-err, lean_mk_string("SSL_connect failed"));
+		return lean_io_result_mk_error(
+			lean_mk_io_error_other_error(-err, lean_mk_string("SSL_connect failed"))
+		);
 	}
 	return lean_io_result_mk_ok(lean_box(0));
 }
@@ -157,7 +159,9 @@ lean_obj_res ssl_connection_write(lean_obj_arg lean_connection, lean_obj_arg lea
 	struct ssl_connection* connection = lean_get_external_data(lean_connection);
 	int err = SSL_write(connection->ssl, lean_sarray_cptr(lean_buf), lean_sarray_size(lean_buf));
 	if (err < 0) {
-		return lean_mk_io_error_other_error(-err, lean_mk_string("SSL_write failed"));
+		return lean_io_result_mk_error(
+			lean_mk_io_error_other_error(-err, lean_mk_string("SSL_write failed"))
+		);
 	}
 	return lean_io_result_mk_ok(lean_box(0));
 }
@@ -167,7 +171,9 @@ lean_obj_res ssl_connection_read(lean_obj_arg lean_connection, uint32_t max) {
 	lean_object* lean_buf = lean_alloc_sarray(1, 0, max);
 	int len = SSL_read(connection->ssl, lean_sarray_cptr(lean_buf), max);
 	if (len < 0) {
-		return lean_mk_io_error_other_error(-len, lean_mk_string("SSL_read failed"));
+		return lean_io_result_mk_error(
+			lean_mk_io_error_other_error(-len, lean_mk_string("SSL_read failed"))
+		);
 	}
 	lean_sarray_object* array = lean_to_sarray(lean_buf);
 	array->m_size = len;
