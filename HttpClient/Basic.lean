@@ -33,6 +33,23 @@ structure Request where
 
 namespace Internal
 
+opaque SSLConnection : Type
+
+@[extern "ssl_connection_create"]
+opaque SSLConnection.create : UInt32 → IO SSLConnection
+
+@[extern "ssl_connection_connect"]
+opaque SSLConnection.connect : SSLConnection → IO Unit
+
+@[extern "ssl_connection_shutdown"]
+opaque SSLConnection.shutdown : SSLConnection → IO Unit
+
+@[extern "ssl_connection_write"]
+opaque SSLConnection.write : SSLConnection → ByteArray → IO Unit
+
+@[extern "ssl_connection_read"]
+opaque SSLConnection.read : SSLConnection → UInt32 → IO ByteArray
+
 def renderPath (uri : Http.URI) : String :=
   path ++ query
   where
@@ -55,8 +72,9 @@ def toRequestString [ToString T] (r : Http.Request T) : String :=
 def connect (uri : URI) : IO Connection := do
   let auth := uri.uri.auth.get uri.hasAuth
   let host := auth.host
+  let secure := uri.uri.scheme == Http.URI.Scheme.HTTPS
   let service := match auth.port with
-    | .none => "http"
+    | .none => if secure then "https" else "http"
     | .some p => toString p
 
   -- call getaddrinfo(3) to resolve the host
@@ -73,10 +91,19 @@ def connect (uri : URI) : IO Connection := do
     let sock ← Socket.mk .inet .stream
     try
       sock.connect addr
-      Connection.make
-        (λ c => sock.send c >>= λ _ => pure ())
-        (.some <$> sock.recv 4096)
-        sock.close
+      if secure
+        then do
+          let sslConnection ← SSLConnection.create sock.getFd
+          sslConnection.connect
+          Connection.make
+            sslConnection.write
+            (.some <$> sslConnection.read 4096)
+            (sslConnection.shutdown *> sock.close)
+        else do
+          Connection.make
+            (λ c => sock.send c >>= λ _ => pure ())
+            (.some <$> sock.recv 4096)
+            sock.close
     catch e =>
       sock.close
       throw e
@@ -126,50 +153,3 @@ def runRequest (connection : Connection) (request : Request)
   | .error e => throw (IO.userError s!"can't parse response {e}")
 
 end Internal
-
-opaque SSLConnection : Type
-
-@[extern "ssl_connection_create"]
-opaque SSLConnection.create : UInt32 → IO SSLConnection
-
-@[extern "ssl_connection_connect"]
-opaque SSLConnection.connect : SSLConnection → IO Unit
-
-@[extern "ssl_connection_write"]
-opaque SSLConnection.write : SSLConnection → ByteArray → IO Unit
-
-@[extern "ssl_connection_read"]
-opaque SSLConnection.read : SSLConnection → UInt32 → IO ByteArray
-
-def testSSL : IO Unit := do
-
-  let uri ← match parseUrl "https://www.google.com" with
-    | .ok res => pure res
-    | .error err => throw (IO.userError err)
-  let request := {
-    method := .GET
-    uri := uri
-    body := .none
-    : Request
-  }
-
-  -- call getaddrinfo(3) to resolve the host
-  let addrs ← AddrInfo.getAddrInfo "www.google.com" "https"
-  let addrInfo ← do
-    match addrs.head? with
-    | none => throw (IO.userError "no address!")
-    | some a => pure a
-
-  -- connect
-  let addr := match addrInfo with
-    | .inet host port => Socket.SockAddr4.v4 host port
-  let sock ← Socket.mk .inet .stream
-  sock.connect addr
-  let sslConnection ← SSLConnection.create sock.getFd
-  sslConnection.connect
-
-  let connection ← Connection.make sslConnection.write (.some <$> sslConnection.read 4096) sock.close
-  let res ← Internal.runRequest connection request
-  IO.println s!"{res.toString}"
-
-end HttpClient

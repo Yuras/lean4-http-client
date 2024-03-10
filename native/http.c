@@ -144,6 +144,15 @@ lean_obj_res ssl_connection_connect(lean_obj_arg lean_connection) {
 	return lean_io_result_mk_ok(lean_box(0));
 }
 
+lean_obj_res ssl_connection_shutdown(lean_obj_arg lean_connection) {
+	struct ssl_connection* connection = lean_get_external_data(lean_connection);
+	int err = SSL_shutdown(connection->ssl);
+	if (err < 0) {
+		printf("shutdown: %i\n (ignoring)", err);
+	}
+	return lean_io_result_mk_ok(lean_box(0));
+}
+
 lean_obj_res ssl_connection_write(lean_obj_arg lean_connection, lean_obj_arg lean_buf) {
 	struct ssl_connection* connection = lean_get_external_data(lean_connection);
 	int err = SSL_write(connection->ssl, lean_sarray_cptr(lean_buf), lean_sarray_size(lean_buf));
