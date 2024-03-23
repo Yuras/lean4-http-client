@@ -93,7 +93,8 @@ def connect (uri : URI) : IO Connection := do
       sock.connect addr
       if secure
         then do
-          let sslConnection ← SSLConnection.create sock.getFd
+          let fd ← sock.getFd
+          let sslConnection ← SSLConnection.create fd
           sslConnection.connect
           Connection.make
             sslConnection.write
