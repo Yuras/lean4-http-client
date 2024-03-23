@@ -1,0 +1,25 @@
+on:
+  push:
+    branches: master
+  pull_request:
+
+name: Build
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: elan
+        run: |
+          set -o pipefail
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - uses: actions/checkout@v3
+
+      - name: build
+        run: lake build
+
+      - name: test
+        run: lake exec http-client-spec
