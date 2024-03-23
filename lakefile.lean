@@ -2,7 +2,7 @@ import Lake
 open Lake DSL
 
 require Http from git "https://github.com/Yuras/lean4-http" @ "http-client"
-require socket from git "https://github.com/hargoniX/socket.lean" @ "main"
+require socket from git "https://github.com/Yuras/socket.lean.git" @ "http-client"
 require soda from git "https://github.com/algebraic-sofia/soda" @ "main"
 require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "stable"
 
@@ -15,9 +15,11 @@ lean_lib «HttpClient» where
 @[default_target]
 lean_exe «http-client-main» where
   root := `Main
+  moreLinkArgs := #["-lssl"]
 
 lean_exe «http-client-spec» where
   root := `Spec
+  moreLinkArgs := #["-lssl"]
 
 target http.o pkg : FilePath := do
   let oFile := pkg.buildDir / "native" / "http.o"
